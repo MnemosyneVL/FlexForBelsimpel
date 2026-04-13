@@ -1,0 +1,54 @@
+# Plan-related GraphQL types.
+#
+# Plans are phone subscription packages from Dutch telecom providers.
+# The structure mirrors the phone types — same pattern for search/filter/facets.
+
+type Plan {
+    id: ID!
+    name: String!
+    slug: String!
+    monthly_cost_eur: Float!
+    data_gb: Float
+    minutes: Int
+    sms: Int
+    is_unlimited_data: Boolean!
+    is_unlimited_calls: Boolean!
+    network_type: String!
+    contract_months: Int!
+    is_active: Boolean!
+    created_at: DateTime
+    updated_at: DateTime
+
+    provider: Provider! @belongsTo
+    phonePlans: [PhonePlan!]! @hasMany
+}
+
+type Provider {
+    id: ID!
+    name: String!
+    slug: String!
+    logo_url: String
+    website_url: String
+    plans: [Plan!]! @hasMany
+}
+
+type PlanSearchResult {
+    items: [Plan!]!
+    total: Int!
+    facets: PlanSearchFacets!
+}
+
+type PlanSearchFacets {
+    providers: [FacetBucket!]!
+    networkTypes: [FacetBucket!]!
+    dataRanges: [FacetBucket!]!
+}
+
+input PlanSearchFilters {
+    providerSlugs: [String!]
+    minData: Float
+    maxMonthlyCost: Float
+    networkType: String
+    isUnlimitedData: Boolean
+    contractMonths: Int
+}

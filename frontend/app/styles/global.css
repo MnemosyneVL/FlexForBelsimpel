@@ -1,0 +1,39 @@
+/* Global styles that apply to the entire application.
+   Component-specific styles use CSS Modules (co-located .module.css files). */
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-gray-800);
+  background-color: var(--color-gray-50);
+}
+
+.main-content {
+  min-height: calc(100vh - var(--header-height) - 200px);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* Utility class for visually hidden but screen-reader accessible text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Link styles */
+a:hover {
+  color: var(--color-primary);
+}
+
+/* Focus styles for keyboard navigation (accessibility) */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

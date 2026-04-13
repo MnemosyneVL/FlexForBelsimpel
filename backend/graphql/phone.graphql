@@ -1,0 +1,92 @@
+# Phone-related GraphQL types.
+#
+# Lighthouse directives map these types directly to Eloquent models:
+#   @belongsTo → loads a related model (Phone → PhoneBrand)
+#   @hasMany → loads a collection of related models (Phone → PhonePlans)
+#
+# This means Lighthouse handles the SQL JOINs for you automatically.
+# When the frontend asks for phone { phoneBrand { name } }, Lighthouse
+# generates: SELECT * FROM phones; SELECT * FROM phone_brands WHERE id IN (...)
+
+type Phone {
+    id: ID!
+    name: String!
+    slug: String!
+    image_url: String
+    price_eur: Float!
+    release_year: Int
+    screen_size: Float
+    storage_gb: Int!
+    ram_gb: Int!
+    battery_mah: Int
+    camera_mp: String
+    os: String!
+    color: String
+    is_5g: Boolean!
+    is_active: Boolean!
+    created_at: DateTime
+    updated_at: DateTime
+
+    # Relationships — Lighthouse resolves these lazily.
+    # They only hit the database if the frontend actually requests them.
+    phoneBrand: PhoneBrand! @belongsTo
+    phonePlans: [PhonePlan!]! @hasMany
+}
+
+type PhoneBrand {
+    id: ID!
+    name: String!
+    slug: String!
+    logo_url: String
+    phones: [Phone!]! @hasMany
+}
+
+# The pivot model — a specific phone+plan combination with pricing
+type PhonePlan {
+    id: ID!
+    monthly_cost_eur: Float!
+    upfront_cost_eur: Float!
+    total_cost_eur: Float!
+    phone: Phone! @belongsTo
+    plan: Plan! @belongsTo
+}
+
+# Search result type returned by the searchPhones query.
+# "items" contains the phones, "total" is the count of all matches,
+# and "facets" provides aggregated counts for the filter sidebar.
+type PhoneSearchResult {
+    items: [Phone!]!
+    total: Int!
+    facets: PhoneSearchFacets!
+}
+
+# Facets are the counts you see next to filter options:
+#   Samsung (12)  ← 12 phones matched that are Samsung
+#   Apple (8)     ← 8 phones matched that are Apple
+#   5G (18)       ← 18 phones have 5G
+#
+# These come from Elasticsearch aggregations — MariaDB can't do this efficiently.
+type PhoneSearchFacets {
+    brands: [FacetBucket!]!
+    priceRanges: [FacetBucket!]!
+    storageOptions: [FacetBucket!]!
+    operatingSystems: [FacetBucket!]!
+}
+
+# A single bucket in a facet: "Samsung" has 12 matching phones
+type FacetBucket {
+    key: String!
+    count: Int!
+}
+
+# Input type for phone search filters.
+# The frontend sends these to narrow down search results.
+input PhoneSearchFilters {
+    brandSlugs: [String!]
+    minPrice: Float
+    maxPrice: Float
+    minStorage: Int
+    minRam: Int
+    is5g: Boolean
+    os: String
+}

@@ -1,0 +1,167 @@
+# GitLab CI/CD Pipeline for FlexForBelsimpel
+#
+# Four stages run in order:
+#   1. lint    — Check code quality (PHP CS Fixer, ESLint, TypeScript)
+#   2. test    — Run PHPUnit and Jest test suites
+#   3. build   — Build the frontend for production
+#   4. deploy  — Deploy to forbelsimpel.chirilojoga.com
+#
+# We use Docker-in-Docker for the test stage so we can spin up
+# MariaDB, Redis, and Elasticsearch as service containers.
+# This mirrors the real docker-compose setup.
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+# Shared variables for all jobs
+variables:
+  MYSQL_DATABASE: flex_for_belsimpel
+  MYSQL_ROOT_PASSWORD: secret
+  MYSQL_USER: flex_user
+  MYSQL_PASSWORD: flex_password
+
+# Cache Composer and npm dependencies between pipeline runs
+# This avoids re-downloading packages every time.
+cache:
+  paths:
+    - backend/vendor/
+    - frontend/node_modules/
+
+# ─── LINT STAGE ──────────────────────────────────────────────
+
+php-lint:
+  stage: lint
+  image: php:8.3-cli-alpine
+  before_script:
+    - cd backend
+    - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    - php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    - composer install --no-interaction --prefer-dist
+  script:
+    - vendor/bin/pint --test
+  only:
+    - merge_requests
+    - main
+
+frontend-lint:
+  stage: lint
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npx tsc --noEmit
+  only:
+    - merge_requests
+    - main
+
+# ─── TEST STAGE ──────────────────────────────────────────────
+
+php-test:
+  stage: test
+  image: php:8.3-cli-alpine
+  services:
+    # MariaDB service container — accessible at "mariadb" hostname
+    - name: mariadb:11.2
+      alias: mariadb
+    # Redis service container
+    - name: redis:7.2-alpine
+      alias: redis
+  variables:
+    DB_CONNECTION: mysql
+    DB_HOST: mariadb
+    DB_DATABASE: flex_for_belsimpel
+    DB_USERNAME: root
+    DB_PASSWORD: secret
+    CACHE_DRIVER: array
+    QUEUE_CONNECTION: sync
+    SESSION_DRIVER: array
+  before_script:
+    - apk add --no-cache libzip-dev icu-dev
+    - docker-php-ext-install pdo_mysql zip intl
+    - cd backend
+    - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    - php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    - composer install --no-interaction --prefer-dist
+    - cp .env.example .env
+    - php artisan key:generate
+    - php artisan migrate --force
+  script:
+    - php artisan test --parallel
+  only:
+    - merge_requests
+    - main
+
+frontend-test:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npx jest --ci --coverage
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: frontend/coverage/cobertura-coverage.xml
+  only:
+    - merge_requests
+    - main
+
+# ─── BUILD STAGE ─────────────────────────────────────────────
+
+frontend-build:
+  stage: build
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/build/
+    expire_in: 1 week
+  only:
+    - main
+
+# ─── DEPLOY STAGE ────────────────────────────────────────────
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client rsync
+    # Set up SSH key for deployment server
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  script:
+    - echo "Deploying to forbelsimpel.chirilojoga.com..."
+    # Sync files to the deployment server
+    - rsync -avz --delete
+        --exclude='.git'
+        --exclude='node_modules'
+        --exclude='vendor'
+        ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"
+    # Run deployment commands on the server
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+        cd $DEPLOY_PATH &&
+        docker compose pull &&
+        docker compose up -d --build &&
+        docker compose exec -T php php artisan migrate --force &&
+        docker compose exec -T php php artisan config:cache &&
+        docker compose exec -T php php artisan route:cache &&
+        echo 'Deployment complete!'
+      "
+  environment:
+    name: production
+    url: https://forbelsimpel.chirilojoga.com
+  only:
+    - main
+  when: manual

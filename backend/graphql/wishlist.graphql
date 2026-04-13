@@ -1,0 +1,50 @@
+# Wishlist and Price Alert types.
+#
+# These require authentication (@guard directive on the query/mutation).
+# A user can save phones, plans, or specific combos to their wishlist,
+# and set price alerts to be notified when prices drop.
+
+type Wishlist {
+    id: ID!
+    notes: String
+    created_at: DateTime
+
+    phone: Phone @belongsTo
+    plan: Plan @belongsTo
+    phonePlan: PhonePlan @belongsTo
+}
+
+type PriceAlert {
+    id: ID!
+    target_price_eur: Float!
+    is_triggered: Boolean!
+    triggered_at: DateTime
+    created_at: DateTime
+
+    phone: Phone @belongsTo
+    plan: Plan @belongsTo
+    phonePlan: PhonePlan @belongsTo
+}
+
+# Extend the Query type with wishlist queries (requires auth)
+extend type Query {
+    myWishlist: [Wishlist!]! @guard
+        @field(resolver: "App\\GraphQL\\Queries\\MyWishlist")
+
+    myPriceAlerts: [PriceAlert!]! @guard
+        @field(resolver: "App\\GraphQL\\Queries\\MyPriceAlerts")
+}
+
+input WishlistInput {
+    phone_id: ID
+    plan_id: ID
+    phone_plan_id: ID
+    notes: String
+}
+
+input PriceAlertInput {
+    phone_id: ID
+    plan_id: ID
+    phone_plan_id: ID
+    target_price_eur: Float!
+}

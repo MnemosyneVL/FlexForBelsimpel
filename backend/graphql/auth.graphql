@@ -1,0 +1,17 @@
+# Authentication types.
+#
+# We use Laravel Sanctum for token-based auth. When a user logs in,
+# they receive a token that they send with every subsequent request.
+# This is simpler than session-based auth for a GraphQL API.
+
+type AuthPayload {
+    token: String!
+    user: User!
+}
+
+type User {
+    id: ID!
+    name: String!
+    email: String!
+    created_at: DateTime
+}

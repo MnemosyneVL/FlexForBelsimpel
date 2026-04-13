@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+
+// The Artisan CLI — Laravel's command-line tool.
+// You run it like: php artisan migrate, php artisan db:seed, etc.
+// It boots the Laravel application and then runs the requested command.
+
+define('LARAVEL_START', microtime(true));
+
+require __DIR__ . '/vendor/autoload.php';
+
+$status = (require_once __DIR__ . '/bootstrap/app.php')
+    ->handleCommand(new Symfony\Component\Console\Input\ArgvInput);
+
+exit($status);

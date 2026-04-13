@@ -1,0 +1,94 @@
+# FlexForBelsimpel — GraphQL Schema (Entry Point)
+#
+# This is the main schema file that Lighthouse loads first.
+# It imports all sub-schemas and defines the root Query and Mutation types.
+#
+# Lighthouse uses "schema-first" development: you write the GraphQL schema,
+# and Lighthouse generates the PHP resolvers automatically using directives.
+# Custom resolvers are only needed for complex logic (like Elasticsearch search).
+#
+# The #import directive pulls in types from other files, keeping things organized
+# by domain (phones, plans, wishlist, auth).
+
+#import phone.graphql
+#import plan.graphql
+#import wishlist.graphql
+#import auth.graphql
+
+# The Query type is the entry point for all read operations.
+# Every field here is something the frontend can ask for.
+type Query {
+    # --- PHONE QUERIES ---
+
+    # Get a single phone by its URL slug (e.g., "samsung-galaxy-s24-ultra")
+    # @find tells Lighthouse to do a simple WHERE query
+    # @eq tells it which column to match the argument against
+    phone(slug: String! @eq): Phone @find
+
+    # Get a paginated list of all phones.
+    # @paginate automatically handles page/perPage arguments and returns
+    # a PhonePaginator type with data, paginatorInfo (total, currentPage, etc.)
+    phones(
+        orderBy: _ @orderBy(columns: ["price_eur", "name", "created_at"])
+    ): [Phone!]! @paginate(defaultCount: 12)
+
+    # Full-text search powered by Elasticsearch.
+    # This is a CUSTOM resolver — Lighthouse can't auto-generate ES queries.
+    # The @field directive points to our SearchPhones PHP class.
+    searchPhones(
+        query: String
+        filters: PhoneSearchFilters
+        page: Int = 1
+        perPage: Int = 12
+    ): PhoneSearchResult! @field(resolver: "App\\GraphQL\\Queries\\SearchPhones")
+
+    # Compare multiple phones side by side
+    comparePhones(ids: [ID!]!): [Phone!]! @field(resolver: "App\\GraphQL\\Queries\\ComparePhones")
+
+    # Get similar phones based on specs (storage, price range, brand)
+    phoneRecommendations(phoneId: ID!, limit: Int = 4): [Phone!]!
+        @field(resolver: "App\\GraphQL\\Queries\\PhoneRecommendations")
+
+    # --- PLAN QUERIES ---
+
+    plan(slug: String! @eq): Plan @find
+
+    plans(
+        orderBy: _ @orderBy(columns: ["monthly_cost_eur", "name", "data_gb"])
+    ): [Plan!]! @paginate(defaultCount: 12)
+
+    searchPlans(
+        query: String
+        filters: PlanSearchFilters
+        page: Int = 1
+        perPage: Int = 12
+    ): PlanSearchResult! @field(resolver: "App\\GraphQL\\Queries\\SearchPlans")
+
+    # --- BRAND & PROVIDER LISTS ---
+    # These are simple lists cached in Redis (brands/providers rarely change)
+
+    phoneBrands: [PhoneBrand!]! @all @cache(maxAge: 3600)
+    providers: [Provider!]! @all @cache(maxAge: 3600)
+}
+
+# The Mutation type handles all write operations (creating/updating/deleting data).
+type Mutation {
+    # --- AUTH ---
+    login(email: String!, password: String!): AuthPayload!
+        @field(resolver: "App\\GraphQL\\Mutations\\Login")
+
+    register(name: String!, email: String!, password: String!, password_confirmation: String!): AuthPayload!
+        @field(resolver: "App\\GraphQL\\Mutations\\Register")
+
+    # --- WISHLIST (requires authentication) ---
+    # @guard means "you must be logged in to use this"
+    addToWishlist(input: WishlistInput!): Wishlist! @guard
+        @field(resolver: "App\\GraphQL\\Mutations\\AddToWishlist")
+
+    removeFromWishlist(id: ID!): Boolean! @guard
+        @field(resolver: "App\\GraphQL\\Mutations\\RemoveFromWishlist")
+
+    # --- PRICE ALERTS ---
+    createPriceAlert(input: PriceAlertInput!): PriceAlert! @guard
+        @field(resolver: "App\\GraphQL\\Mutations\\CreatePriceAlert")
+}

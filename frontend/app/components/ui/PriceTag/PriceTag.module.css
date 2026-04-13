@@ -1,0 +1,23 @@
+.priceTag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.amount {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.period {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+}
+
+.upfront {
+  width: 100%;
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+}

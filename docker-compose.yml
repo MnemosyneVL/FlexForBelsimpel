@@ -1,0 +1,202 @@
+# FlexForBelsimpel — Docker Compose Configuration
+#
+# This file defines all 8 services needed to run the application locally.
+# Run `docker compose up -d` to start everything.
+#
+# Architecture:
+#   Browser → Nginx (port 8080) → PHP-FPM (GraphQL API) or Node (React SSR)
+#   PHP connects to: MariaDB, Redis, Elasticsearch, RabbitMQ
+#   Mailpit catches all outgoing emails in development
+
+services:
+
+  # --- REVERSE PROXY ---
+  # Nginx sits in front of everything and routes requests:
+  #   /graphql and /graphiql → PHP-FPM (Laravel backend)
+  #   Everything else → Node.js (React Router v7 frontend)
+  nginx:
+    build:
+      context: ./docker/nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - php
+      - node
+    volumes:
+      # Mount the backend public directory so Nginx can serve static files directly
+      - ./backend/public:/var/www/html/public:ro
+    networks:
+      - flexforbelsimpel
+
+  # --- BACKEND (PHP) ---
+  # Runs two processes via supervisord:
+  #   1. PHP-FPM: handles GraphQL HTTP requests from Nginx
+  #   2. Queue Worker: processes async jobs from RabbitMQ (search sync, notifications)
+  php:
+    build:
+      context: ./docker/php
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      # Laravel reads these from .env, but we set defaults here for Docker
+      - DB_HOST=mariadb
+      - DB_DATABASE=flexforbelsimpel
+      - DB_USERNAME=flex
+      - DB_PASSWORD=secret
+      - REDIS_HOST=redis
+      - ELASTICSEARCH_HOST=elasticsearch:9200
+      - RABBITMQ_HOST=rabbitmq
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+    networks:
+      - flexforbelsimpel
+
+  # --- FRONTEND (Node.js) ---
+  # Runs the React Router v7 development server with SSR (server-side rendering).
+  # In production, this would be a built bundle served by a Node process.
+  node:
+    build:
+      context: ./docker/node
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume to prevent host node_modules from overriding container's
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+      # Storybook runs on a separate port so we can browse the component library
+      - "6006:6006"
+    environment:
+      - NODE_ENV=development
+      # The frontend calls the GraphQL API through Nginx
+      - VITE_GRAPHQL_URL=http://nginx/graphql
+    networks:
+      - flexforbelsimpel
+
+  # --- PRIMARY DATABASE ---
+  # MariaDB stores all structured data: phones, plans, users, wishlists, etc.
+  # It's essentially MySQL but community-driven — Belsimpel uses this as their main DB.
+  mariadb:
+    image: mariadb:11.2
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: rootsecret
+      MARIADB_DATABASE: flexforbelsimpel
+      MARIADB_USER: flex
+      MARIADB_PASSWORD: secret
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flexforbelsimpel
+
+  # --- CACHE / SESSIONS / RATE LIMITING ---
+  # Redis is an in-memory store used for 3 purposes:
+  #   1. Caching: frequently requested data (phone lists, facet counts)
+  #   2. Sessions: remembering who is logged in without hitting the database
+  #   3. Rate limiting: preventing API abuse (60 req/min for guests)
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flexforbelsimpel
+
+  # --- SEARCH ENGINE ---
+  # Elasticsearch powers the phone/plan search with features MariaDB can't do:
+  #   - Fuzzy matching: "samung" still finds "Samsung"
+  #   - Faceted filters: counts per brand, price range, storage tier
+  #   - Relevance scoring: most relevant results appear first
+  elasticsearch:
+    build:
+      context: ./docker/elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - flexforbelsimpel
+
+  # --- MESSAGE QUEUE ---
+  # RabbitMQ handles asynchronous tasks so the user doesn't wait:
+  #   - search-sync: keeps Elasticsearch in sync when phone/plan data changes
+  #   - notifications: sends price drop alerts to users
+  #   - recommendations: calculates similar phone suggestions
+  # The management UI at localhost:15672 lets you see queues and messages.
+  rabbitmq:
+    build:
+      context: ./docker/rabbitmq
+    ports:
+      - "5672:5672"
+      # Management dashboard — handy for debugging queues
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: flex
+      RABBITMQ_DEFAULT_PASS: secret
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - flexforbelsimpel
+
+  # --- DEV EMAIL CATCHER ---
+  # Mailpit catches all emails sent by the application (price alerts, etc.)
+  # instead of actually sending them. Visit localhost:8025 to see the inbox.
+  # This is a dev-only tool — in production you'd use a real mail service.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - flexforbelsimpel
+
+# Named volumes persist data between container restarts.
+# Without these, you'd lose your database every time you run `docker compose down`.
+volumes:
+  mariadb-data:
+  redis-data:
+  elasticsearch-data:
+  rabbitmq-data:
+
+# All services share one network so they can find each other by name.
+# For example, PHP connects to "mariadb:3306" — Docker resolves "mariadb"
+# to the container's IP address automatically.
+networks:
+  flexforbelsimpel:
+    driver: bridge
