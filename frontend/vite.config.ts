@@ -29,6 +29,16 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 3000,
+    // HMR (Hot Module Replacement) config for Docker.
+    // When accessing the app through Nginx (port 8080), Vite's client-side
+    // code needs to know where to connect for live updates and CSS injection.
+    // We tell it to connect to port 3000 (Node) directly, since Nginx's
+    // WebSocket proxying can interfere with Vite's HMR protocol.
+    hmr: {
+      port: 3000,
+    },
+    // Allow requests from Nginx (which forwards with different Host header)
+    allowedHosts: ["localhost", "nginx"],
     // Proxy GraphQL requests to the Laravel backend during development.
     // This avoids CORS issues — both frontend and API appear to be on the same origin.
     proxy: {

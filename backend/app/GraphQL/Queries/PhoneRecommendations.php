@@ -47,8 +47,11 @@ class PhoneRecommendations
                 ->whereBetween('price_eur', [$minPrice, $maxPrice])
                 // Prefer phones with matching 5G capability
                 ->orderByRaw('(is_5g = ?) DESC', [$phone->is_5g])
-                // Then by closest storage size
-                ->orderByRaw('ABS(storage_gb - ?) ASC', [$phone->storage_gb])
+                // Then by closest storage size.
+                // CAST to SIGNED is needed because storage_gb is unsigned —
+                // subtracting a larger value from a smaller unsigned int causes
+                // an overflow error in MariaDB (e.g. 128 - 256 = underflow).
+                ->orderByRaw('ABS(CAST(storage_gb AS SIGNED) - ?) ASC', [$phone->storage_gb])
                 ->limit($limit)
                 ->get()
                 ->all();

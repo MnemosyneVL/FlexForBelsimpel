@@ -17,7 +17,7 @@ export default function Footer() {
         <div className={styles.links}>
           <div className={styles.linkGroup}>
             <h4 className={styles.linkGroupTitle}>Project</h4>
-            <a href="https://github.com/chirilojoga" className={styles.link}>
+            <a href="https://github.com/MnemosyneVL" className={styles.link}>
               Broncode
             </a>
             <a href="https://chirilojoga.com" className={styles.link}>

@@ -50,12 +50,20 @@ RUN apk add --no-cache autoconf g++ make \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Set up supervisord to manage our two processes.
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Copy config files from the docker/php directory
+COPY docker/php/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Custom PHP settings for development
-COPY php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+
+# Create log directory for supervisord
+RUN mkdir -p /var/log/supervisor
 
 WORKDIR /var/www/html
+
+# Copy backend code into the image (for production builds).
+# In development, docker-compose mounts ./backend as a volume instead.
+COPY backend/ .
 
 # Supervisord starts both php-fpm and the queue worker
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

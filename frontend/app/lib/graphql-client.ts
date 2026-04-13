@@ -10,9 +10,22 @@
 
 import { createClient, cacheExchange, fetchExchange } from "urql";
 
-// Create the urql client.
-// The URL "/graphql" is relative — in development, Vite's proxy forwards it
-// to the Laravel backend. In production, Nginx handles the routing.
+// Determine the GraphQL URL based on where the code is running:
+//   - Server-side (Node.js SSR): use the full internal Docker URL
+//     "http://nginx/graphql" — Node talks to Nginx inside the Docker network
+//   - Client-side (browser): use "/graphql" — the browser adds the hostname
+//     automatically, and Nginx routes it to PHP-FPM
+//
+// Why the difference? In a browser, "/graphql" becomes "http://localhost:8080/graphql".
+// But in Node.js there's no browser — "/graphql" is just a path with no host.
+// Node doesn't know where to send the request, so we must give it the full URL.
+const GRAPHQL_URL =
+  typeof window === "undefined"
+    ? (process.env.VITE_GRAPHQL_URL || "http://nginx/graphql")
+    : "/graphql";
+
+// Create the urql client for use in React components (client-side).
+// Uses "/graphql" since it always runs in the browser.
 export const graphqlClient = createClient({
   url: "/graphql",
   exchanges: [
@@ -25,17 +38,27 @@ export const graphqlClient = createClient({
 });
 
 // Helper function to execute a GraphQL query from route loaders.
-// Loaders run on the server during SSR, so we need a direct fetch approach
-// rather than React hooks (which only work in components).
+// Loaders run on the server during SSR, so we use fetch() with the
+// full internal URL instead of the urql client.
 export async function queryGraphQL<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  const result = await graphqlClient.query(query, variables ?? {}).toPromise();
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables: variables ?? {} }),
+  });
 
-  if (result.error) {
-    throw new Error(`GraphQL Error: ${result.error.message}`);
+  if (!response.ok) {
+    throw new Error(`GraphQL HTTP Error: ${response.status}`);
   }
 
-  return result.data as T;
+  const json = await response.json();
+
+  if (json.errors?.length) {
+    throw new Error(`GraphQL Error: ${json.errors[0].message}`);
+  }
+
+  return json.data as T;
 }

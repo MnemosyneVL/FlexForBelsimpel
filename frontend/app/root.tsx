@@ -16,32 +16,27 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import type { LinksFunction } from "react-router";
 import Header from "~/components/layout/Header/Header";
 import Footer from "~/components/layout/Footer/Footer";
 
-// Import global styles — these apply to the entire application
-import globalStyles from "~/styles/global.css?url";
-import resetStyles from "~/styles/reset.css?url";
-import variableStyles from "~/styles/variables.css?url";
-
-// The links function tells React Router which CSS files to include in <head>
-export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: resetStyles },
-  { rel: "stylesheet", href: variableStyles },
-  { rel: "stylesheet", href: globalStyles },
-];
+// Import global styles — these apply to the entire application.
+// In React Router v7 with Vite, plain CSS imports are automatically
+// collected and injected into the page (both SSR and client-side).
+// No need for a links() function — Vite handles it.
+import "~/styles/reset.css";
+import "~/styles/variables.css";
+import "~/styles/global.css";
 
 export default function Root() {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {/* Header stays visible on every page */}
         <Header />
 

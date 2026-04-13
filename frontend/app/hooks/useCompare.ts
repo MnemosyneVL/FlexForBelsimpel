@@ -1,23 +1,27 @@
 // useCompare hook — manages the phone comparison list.
 //
-// The comparison list is stored in URL search params (?compare=1,2,3).
-// This makes it:
-//   1. Shareable — copy the URL and send it to someone
-//   2. Bookmarkable — save the comparison for later
-//   3. Persistent — survives page refreshes
+// Stores selected phone IDs in React state (useState), NOT in URL params.
 //
-// We limit to 4 phones because comparing more gets unreadable.
+// Why not URL params? Because useSearchParams triggers a React Router
+// navigation on every change. In React Router v7, a navigation re-runs
+// the page's loader (which calls GraphQL/Elasticsearch). So every
+// checkbox tick would cause a ~3 second server roundtrip — terrible UX.
+//
+// React state is instant. When the user clicks "Vergelijk nu",
+// the compare page link already includes the IDs in its URL
+// (/compare?compare=1,2,3), so the compare page can still load them.
+//
+// Trade-off: compare selections don't survive a page refresh on /phones.
+// That's fine — it's a temporary selection, like items in a shopping cart
+// before checkout. The compare PAGE itself reads IDs from the URL,
+// so that link IS shareable.
 
-import { useSearchParams } from "react-router";
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
+
+const MAX_COMPARE = 4;
 
 export function useCompare() {
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Read the current compare IDs from the URL
-  const compareIds: string[] = searchParams.get("compare")
-    ? searchParams.get("compare")!.split(",")
-    : [];
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   // Check if a specific phone is in the comparison list
   const isComparing = useCallback(
@@ -28,43 +32,34 @@ export function useCompare() {
   // Add a phone to the comparison (max 4)
   const addToCompare = useCallback(
     (phoneId: string) => {
-      if (compareIds.length >= 4 || compareIds.includes(phoneId)) return;
-
-      const newIds = [...compareIds, phoneId];
-      setSearchParams((prev) => {
-        prev.set("compare", newIds.join(","));
-        return prev;
+      setCompareIds((prev) => {
+        if (prev.length >= MAX_COMPARE || prev.includes(phoneId)) return prev;
+        return [...prev, phoneId];
       });
     },
-    [compareIds, setSearchParams]
+    []
   );
 
   // Remove a phone from the comparison
   const removeFromCompare = useCallback(
     (phoneId: string) => {
-      const newIds = compareIds.filter((id) => id !== phoneId);
-      setSearchParams((prev) => {
-        if (newIds.length === 0) {
-          prev.delete("compare");
-        } else {
-          prev.set("compare", newIds.join(","));
-        }
-        return prev;
-      });
+      setCompareIds((prev) => prev.filter((id) => id !== phoneId));
     },
-    [compareIds, setSearchParams]
+    []
   );
 
   // Toggle a phone in/out of the comparison
   const toggleCompare = useCallback(
     (phoneId: string) => {
-      if (isComparing(phoneId)) {
-        removeFromCompare(phoneId);
-      } else {
-        addToCompare(phoneId);
-      }
+      setCompareIds((prev) => {
+        if (prev.includes(phoneId)) {
+          return prev.filter((id) => id !== phoneId);
+        }
+        if (prev.length >= MAX_COMPARE) return prev;
+        return [...prev, phoneId];
+      });
     },
-    [isComparing, addToCompare, removeFromCompare]
+    []
   );
 
   return {
@@ -73,6 +68,6 @@ export function useCompare() {
     toggleCompare,
     addToCompare,
     removeFromCompare,
-    canAddMore: compareIds.length < 4,
+    canAddMore: compareIds.length < MAX_COMPARE,
   };
 }

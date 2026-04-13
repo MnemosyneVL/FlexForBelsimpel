@@ -23,16 +23,17 @@ export default [
   // About page — architecture explanation
   route("about", "routes/about.tsx"),
 
-  // Phone section — layout wraps all phone routes with shared navigation
-  layout("routes/phones.tsx", [
+  // Phone section — route("phones", ...) creates the /phones URL prefix.
+  // The layout file (phones.tsx) renders an <Outlet /> that child routes fill in.
+  route("phones", "routes/phones.tsx", [
     // /phones — phone listing with search and filters
     index("routes/phones._index.tsx"),
-    // /phones/:phoneId — single phone detail page
+    // /phones/:phoneId — single phone detail page (e.g., /phones/samsung-galaxy-s24-ultra)
     route(":phoneId", "routes/phones.$phoneId.tsx"),
   ]),
 
-  // Plan section
-  layout("routes/plans.tsx", [
+  // Plan section — same pattern as phones
+  route("plans", "routes/plans.tsx", [
     index("routes/plans._index.tsx"),
     route(":planId", "routes/plans.$planId.tsx"),
   ]),

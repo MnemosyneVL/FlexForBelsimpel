@@ -34,7 +34,8 @@ services:
   #   2. Queue Worker: processes async jobs from RabbitMQ (search sync, notifications)
   php:
     build:
-      context: ./docker/php
+      context: .
+      dockerfile: docker/php/Dockerfile
     volumes:
       - ./backend:/var/www/html
     depends_on:
@@ -53,7 +54,7 @@ services:
       - DB_USERNAME=flex
       - DB_PASSWORD=secret
       - REDIS_HOST=redis
-      - ELASTICSEARCH_HOST=elasticsearch:9200
+      - ELASTICSEARCH_HOST=elasticsearch
       - RABBITMQ_HOST=rabbitmq
       - MAIL_HOST=mailpit
       - MAIL_PORT=1025
@@ -65,7 +66,8 @@ services:
   # In production, this would be a built bundle served by a Node process.
   node:
     build:
-      context: ./docker/node
+      context: .
+      dockerfile: docker/node/Dockerfile
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from overriding container's
@@ -128,8 +130,7 @@ services:
   #   - Faceted filters: counts per brand, price range, storage tier
   #   - Relevance scoring: most relevant results appear first
   elasticsearch:
-    build:
-      context: ./docker/elasticsearch
+    image: elasticsearch:8.12.0
     ports:
       - "9200:9200"
     environment:
@@ -154,8 +155,7 @@ services:
   #   - recommendations: calculates similar phone suggestions
   # The management UI at localhost:15672 lets you see queues and messages.
   rabbitmq:
-    build:
-      context: ./docker/rabbitmq
+    image: rabbitmq:3.13-management-alpine
     ports:
       - "5672:5672"
       # Management dashboard — handy for debugging queues

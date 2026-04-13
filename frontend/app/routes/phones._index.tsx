@@ -13,12 +13,13 @@
 // to get search results BEFORE the page renders. The user sees a
 // fully loaded page, not a loading spinner.
 
-import { useLoaderData, useSearchParams } from "react-router";
+import { useLoaderData, useSearchParams, Link } from "react-router";
 import type { Route } from "./+types/phones._index";
 import { queryGraphQL } from "~/lib/graphql-client";
 import { SEARCH_PHONES } from "~/graphql/queries/phones";
 import SearchInput from "~/components/ui/SearchInput/SearchInput";
 import PhoneCard from "~/components/phones/PhoneCard/PhoneCard";
+import Button from "~/components/ui/Button/Button";
 import { useCompare } from "~/hooks/useCompare";
 import { useState } from "react";
 import { useDebounce } from "~/hooks/useDebounce";
@@ -70,7 +71,7 @@ export default function PhonesIndex() {
   const { searchResult, query: initialQuery } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchValue, setSearchValue] = useState(initialQuery);
-  const { isComparing, toggleCompare } = useCompare();
+  const { compareIds, isComparing, toggleCompare } = useCompare();
 
   // Debounce search — wait 300ms after user stops typing before searching
   const debouncedSearch = useDebounce(searchValue);
@@ -203,6 +204,36 @@ export default function PhonesIndex() {
           </div>
         )}
       </div>
+
+      {/* Floating compare bar — appears when phones are selected.
+          Links to /compare with the selected IDs in the URL so the
+          compare page can load them. */}
+      {compareIds.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "var(--color-white)",
+            borderTop: "2px solid var(--color-primary)",
+            padding: "var(--space-3) var(--space-6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "var(--space-4)",
+            boxShadow: "0 -4px 12px rgba(0, 0, 0, 0.1)",
+            zIndex: 50,
+          }}
+        >
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--color-gray-600)" }}>
+            {compareIds.length} telefoon{compareIds.length !== 1 ? "s" : ""} geselecteerd
+          </span>
+          <Link to={`/compare?compare=${compareIds.join(",")}`}>
+            <Button>Vergelijk nu</Button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

@@ -15,12 +15,12 @@ WORKDIR /app
 # Copy package files first (Docker caching trick).
 # If package.json hasn't changed, Docker reuses the cached npm install layer
 # instead of reinstalling everything — saves minutes on rebuilds.
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 RUN npm install
 
-# Copy the rest of the application code
-COPY . .
+# Copy the rest of the frontend application code
+COPY frontend/ .
 
 # Port 3000: React Router v7 dev server
 # Port 6006: Storybook component library
