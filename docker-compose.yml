@@ -18,13 +18,16 @@ services:
     build:
       context: ./docker/nginx
     ports:
-      - "8080:80"
+      - "80:80"
+      - "443:443"
     depends_on:
       - php
       - node
     volumes:
       # Mount the backend public directory so Nginx can serve static files directly
       - ./backend/public:/var/www/html/public:ro
+      # Mount SSL certificates from Let's Encrypt (only exists on production server)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - flexforbelsimpel
 
