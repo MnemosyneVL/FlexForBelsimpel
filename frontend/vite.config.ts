@@ -38,7 +38,7 @@ export default defineConfig({
       port: 3000,
     },
     // Allow requests from Nginx (which forwards with different Host header)
-    allowedHosts: ["localhost", "nginx"],
+    allowedHosts: ["localhost", "nginx", "forbelsimpel.chirilojoga.com"],
     // Proxy GraphQL requests to the Laravel backend during development.
     // This avoids CORS issues — both frontend and API appear to be on the same origin.
     proxy: {
