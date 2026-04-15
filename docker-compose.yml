@@ -75,10 +75,6 @@ services:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from overriding container's
       - /app/node_modules
-    ports:
-      - "3000:3000"
-      # Storybook runs on a separate port so we can browse the component library
-      - "6006:6006"
     environment:
       - NODE_ENV=development
       # The frontend calls the GraphQL API through Nginx
@@ -91,8 +87,6 @@ services:
   # It's essentially MySQL but community-driven — Belsimpel uses this as their main DB.
   mariadb:
     image: mariadb:11.2
-    ports:
-      - "3306:3306"
     environment:
       MARIADB_ROOT_PASSWORD: rootsecret
       MARIADB_DATABASE: flexforbelsimpel
@@ -115,8 +109,6 @@ services:
   #   3. Rate limiting: preventing API abuse (60 req/min for guests)
   redis:
     image: redis:7.2-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -134,8 +126,6 @@ services:
   #   - Relevance scoring: most relevant results appear first
   elasticsearch:
     image: elasticsearch:8.12.0
-    ports:
-      - "9200:9200"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -159,10 +149,6 @@ services:
   # The management UI at localhost:15672 lets you see queues and messages.
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    ports:
-      - "5672:5672"
-      # Management dashboard — handy for debugging queues
-      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: flex
       RABBITMQ_DEFAULT_PASS: secret
@@ -183,9 +169,6 @@ services:
   # This is a dev-only tool — in production you'd use a real mail service.
   mailpit:
     image: axllent/mailpit:latest
-    ports:
-      - "8025:8025"
-      - "1025:1025"
     networks:
       - flexforbelsimpel
 
