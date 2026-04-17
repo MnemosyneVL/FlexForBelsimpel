@@ -5,6 +5,10 @@ A phone and plan comparison tool built as a showcase project for [Belsimpel](htt
 **Live demo:** [forbelsimpel.chirilojoga.com](https://forbelsimpel.chirilojoga.com)
 
 ---
+## Usage of AI
+I used Claude Code to create the Dutch translations, database seeding, for bug scouting, for style (CSS) consistency, and for Hetzner integration, but this project is not vibe-coded.  
+
+---
 
 ## Tech Stack
 
